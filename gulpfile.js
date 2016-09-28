@@ -12,8 +12,9 @@ require('laravel-elixir-vue');
  | file for our application, as well as publishing vendor resources.
  |
  */
-
-elixir(mix => {
+elixir.config.publicPath = 'public_html';
+elixir(
+    mix => {
     mix.sass('app.scss')
        .webpack('app.js');
 });
