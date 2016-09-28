@@ -1,4 +1,3 @@
-
 window._ = require('lodash');
 
 /**
@@ -37,9 +36,16 @@ Vue.http.interceptors.push((request, next) => {
  * allows your team to easily build robust real-time web applications.
  */
 
-// import Echo from "laravel-echo"
+import Echo from "laravel-echo"
 
-// window.Echo = new Echo({
-//     broadcaster: 'pusher',
-//     key: 'your-pusher-key'
-// });
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    key:         '336e88f8b76a3c646f60',
+    cluster:     'eu'
+});
+
+window.Echo.channel('processedpages')
+    .listen('PageProcessed', (e) => {
+        console.log(e);
+
+    });

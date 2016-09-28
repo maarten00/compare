@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PageProcessed;
+use App\Objects\MatchedPage;
+use App\Objects\PageResults;
+use App\Objects\ProcessedPage;
 use Goodby\CSV\Import\Standard\Interpreter;
 use Goodby\CSV\Import\Standard\LexerConfig;
 use Goodby\CSV\Import\Standard\Lexer;
 use Illuminate\Http\Request;
 
+//TODO: This sucks. We should try to read the headers from the CSV or have the user specify which columns to use and how.
 const id                = 0;
 const title             = 1;
 const content           = 2;
-const postType          = 3;
+const postType          = 1;
 const percentageToMatch = 65;
 
 class CompareController extends Controller {
@@ -50,15 +55,6 @@ class CompareController extends Controller {
 		$compareToFile = $request->file( 'compareTo' );
 		$importer->parse( $compareToFile->path(), $interpreterTwo );
 
-		ob_start();
-		echo sprintf( '<h3>Results for %s</h3>', $compareFromFile->getClientOriginalName() );
-		echo sprintf( '<table><tr><th><b>%s Page</b></th><th><b>Matching pages in %s</b></th></tr>',
-			$compareFromFile->getClientOriginalName(), $compareToFile->getClientOriginalName() );
-		//Nasty.
-		//TODO: Refactor into use of Laravel events + pusher API to push results to front-end.
-		ob_flush();
-		flush();
-
 		foreach ( $comparedFromData as $key => $comparedSite ) {
 			if ( $comparedSite [ content ] == '' ) {
 				continue;
@@ -71,24 +67,17 @@ class CompareController extends Controller {
 
 				$calculated = $this->_compareThem( $comparedSite[ content ], $compareTo[ content ] );
 				if ( $calculated > percentageToMatch ) {
-					$compare[ $comparedSite[ id ] ][ $compareTo[ id ] ] = [
-						'id'         => $compareTo[ id ],
-						'title'      => $compareTo[ title ],
-						'postType'   => $compareTo[ postType ],
-						'percentage' => $calculated
-					];
+					$compare[ $comparedSite[ id ] ][] = new MatchedPage($compareTo[id], $compareTo[title], $compareTo[postType], $calculated);
 				}
 
 			}
 			unset( $comparedFromData[ $key ] );
 			if ( isset( $compare[ $comparedSite[ id ] ] ) ) {
-				$this->_printRow( $comparedSite, $compare[ $comparedSite[ id ] ] );
+				$processedPage = new ProcessedPage($comparedSite[ id ], $comparedSite[title], $comparedSite[postType]);
+				$pageResults = new PageResults($compare[ $comparedSite[ id ] ]);
+				event(new PageProcessed($processedPage, $pageResults));
 			}
 		}
-		echo "</table>";
-		ob_flush();
-		flush();
-		ob_end_flush();
 	}
 
 	private function _compareThem( $str_1, $str_2 ) {
@@ -104,15 +93,4 @@ class CompareController extends Controller {
 
 	}
 
-	private function _printRow( array $comparedSiteData, array $matchingPages ) {
-		echo sprintf( '<tr style="border: 1px solid black;"><td style="border: 1px solid black;">%2$s(ID: %1$d) [Posttype: %3$s]</td><td style="border: 1px solid black;">',
-			$comparedSiteData[ id ], $comparedSiteData[ title ], $comparedSiteData[ postType ] );
-		foreach ( $matchingPages as $matchingPage ) {
-			echo sprintf( '2$s: %3$d%% (ID: %1$s) [Posttype: %4$s]<br>', $matchingPage['id'], $matchingPage['title'],
-				$matchingPage['percentage'], $matchingPage['postType'] );
-		}
-		echo "</td></tr>";
-		ob_flush();
-		flush();
-	}
 }
